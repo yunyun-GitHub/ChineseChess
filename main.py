@@ -177,21 +177,6 @@ class Checkerboard:
                 return 10 - coordinate[0], 11 - coordinate[1]
 
     @staticmethod
-    def demo():
-        m = {}
-        for chess in Checkerboard.XinJv:
-            m[Checkerboard.player_coordinate_convert("盘转黑", chess[-2:], True)] = chess[0]
-        print(m)
-        # simulation = Checkerboard.engine(m, "红黑")
-        # if simulation[-1] == "和棋":
-        #     simulation.pop()
-        #     pass
-        # elif simulation[-1] == "红棋胜":
-        #     pass
-        # elif simulation[-1] == "黑棋胜":
-        #     pass
-
-    @staticmethod
     def general_meet(coordinate_self, chess_manual, coordinate):
         chess_manual = chess_manual.copy()
         if chess_manual.get(coordinate) in {"黑将", "红帅"}:
@@ -311,6 +296,21 @@ class Checkerboard:
     def calculate_coordinate(chess_manual_all):
 
         return random.choice(list(chess_manual_all.keys()))
+
+    @staticmethod
+    def demo():
+        m = {}
+        for chess in Checkerboard.XinJv:
+            m[Checkerboard.player_coordinate_convert("盘转黑", chess[-2:], True)] = chess[0]
+        print(m)
+        simulation = Checkerboard.engine(m, "红黑")
+        if simulation[-1] == "和棋":
+            simulation.pop()
+            pass
+        elif simulation[-1] == "红棋胜":
+            pass
+        elif simulation[-1] == "黑棋胜":
+            pass
 
     @staticmethod
     def engine(chess_manual, player):

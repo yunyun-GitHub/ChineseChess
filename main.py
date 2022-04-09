@@ -298,22 +298,82 @@ class Checkerboard:
         return random.choice(list(chess_manual_all.keys()))
 
     @staticmethod
-    def demo():
-        m = {}
-        for chess in Checkerboard.XinJv:
-            m[Checkerboard.player_coordinate_convert("盘转黑", chess[-2:], True)] = chess[0]
-        print(m)
-        simulation = Checkerboard.engine(m, "红黑")
-        if simulation[-1] == "和棋":
-            simulation.pop()
-            pass
-        elif simulation[-1] == "红棋胜":
-            pass
-        elif simulation[-1] == "黑棋胜":
-            pass
+    def translate_move_chess(move_chess, chess_name):
+        x1, y1, x2, y2 = move_chess[0][0], move_chess[0][1], move_chess[1][0], move_chess[1][1]
+        c = chess_name
+        if chess_name in {"车", "炮", "砲", "将", "帅", "兵", "卒"}:
+            if x1 == x2:
+                if y2 > y1:
+                    c = chess_name + str(x1) + "进" + str(y2 - y1)
+                elif y2 < y1:
+                    c = chess_name + str(x1) + "退" + str(y1 - y2)
+            elif y1 == y2:
+                c = chess_name + str(x1) + "平" + str(x2)
+        elif chess_name in {"马", "象", "相", "士", "仕"}:
+            if y2 > y1:
+                c = chess_name + str(x1) + "进" + str(x2)
+            elif y2 < y1:
+                c = chess_name + str(x1) + "退" + str(x2)
+        return c
 
     @staticmethod
-    def engine(chess_manual, player):
+    def one_hot(feature, player):
+        r = {"红车": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红马": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+             "红砲": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红相": [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+             "红仕": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红帅": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+             "红兵": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], "黑车": [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+             "黑马": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], "黑炮": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+             "黑象": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], "黑士": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+             "黑将": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], "黑卒": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]}
+        b = {"黑车": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "黑马": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+             "黑炮": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "黑象": [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+             "黑士": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], "黑将": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+             "黑卒": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], "红车": [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+             "红马": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], "红砲": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+             "红相": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], "红仕": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+             "红帅": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], "红兵": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]}
+        if feature:
+            if player == "红":
+                return r[feature]
+            elif player == "黑":
+                return b[feature]
+        else:
+            return [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    @staticmethod
+    def demo():
+        initial_chess_manual = {}
+        for chess in Checkerboard.XinJv:
+            initial_chess_manual[Checkerboard.player_coordinate_convert("盘转黑", chess[-2:], True)] = chess[0]
+
+        simulation = Checkerboard.simulation_chess(initial_chess_manual, "红黑")
+        result = simulation.pop()
+        train_samples = []
+        for move_chess, chess_manual in simulation:
+            sample = []
+            print(Checkerboard.translate_move_chess(move_chess, chess_manual[move_chess[1]][1]))
+            for j in range(1, 11):
+                for i in range(1, 10):
+                    sample.append(Checkerboard.one_hot(chess_manual.get((i, j)), chess_manual[move_chess[1]][0]))
+            if result == "和棋":
+                sample.append([1, 0, 0])
+            elif result == "红棋胜":
+                if chess_manual[move_chess[1]][0] == "红":
+                    sample.append([0, 1, 0])
+                elif chess_manual[move_chess[1]][0] == "黑":
+                    sample.append([0, 0, 1])
+            elif result == "黑棋胜":
+                if chess_manual[move_chess[1]][0] == "红":
+                    sample.append([0, 0, 1])
+                elif chess_manual[move_chess[1]][0] == "黑":
+                    sample.append([0, 1, 0])
+            print(sample)
+            train_samples.append(sample)
+
+        return train_samples
+
+    @staticmethod
+    def simulation_chess(chess_manual, player):
         num = 0
         chess_num = len(chess_manual)
         besieged = None
@@ -323,7 +383,7 @@ class Checkerboard:
             for chess in chess_manual:
                 m[(10 - chess[0], 11 - chess[1])] = chess_manual[chess]
             chess_manual = m
-            chess_manual_all = {}
+            chess_manual_all = {}  # 储存当前局面下的所有走法的局面
             for chess in chess_manual:
                 if chess_manual[chess][0] == player[0]:
                     for coordinate in Checkerboard.may_coordinate(chess, chess_manual):
@@ -332,10 +392,10 @@ class Checkerboard:
                         chess_manual_clone.pop(chess)
                         chess_manual_all[(chess, coordinate)] = chess_manual_clone
             if chess_manual_all:
-                chess, coordinate = Checkerboard.calculate_coordinate(chess_manual_all)
-                chess_manual[coordinate] = chess_manual[chess]
-                chess_manual.pop(chess)
-                simulation.append(((chess, coordinate), chess_manual_all))  # 保存走法
+                move_chess = Checkerboard.calculate_coordinate(chess_manual_all)  # 选择走法
+                chess_manual[move_chess[1]] = chess_manual[move_chess[0]]
+                chess_manual.pop(move_chess[0])
+                simulation.append((move_chess, chess_manual))  # 保存走法
                 player = player[::-1]
                 if len(chess_manual) == chess_num:
                     num += 1

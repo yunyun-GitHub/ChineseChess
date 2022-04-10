@@ -81,7 +81,7 @@ class Checkerboard:
                         self.flip_board()  # 翻转棋盘
                     elif self.button_coordinate[0] < event.pos[0] < self.button_coordinate[0] + 18 and \
                             self.button_coordinate[1] < event.pos[1] < self.button_coordinate[1] + 18:
-                        self.demo()
+                        Engine.demo()
                     elif self.end is False:
                         self.update_checkerboard_state(self.translate_coordinate(event.pos))  # 更新棋盘状态属性
                     break
@@ -291,12 +291,8 @@ class Checkerboard:
         return coordinate_gather
 
     @staticmethod
-    def calculate_coordinate(chess_manual_all):
-
-        return random.choice(list(chess_manual_all.keys()))
-
-    @staticmethod
     def translate_move_chess(move_chess, chess_name):
+        """接受棋手坐标形式的走法和棋子名字，返回四字棋谱语言"""
         x1, y1, x2, y2 = move_chess[0][0], move_chess[0][1], move_chess[1][0], move_chess[1][1]
         c = chess_name
         if chess_name in {"车", "炮", "砲", "将", "帅", "兵", "卒"}:
@@ -313,6 +309,29 @@ class Checkerboard:
             elif y2 < y1:
                 c = chess_name + str(x1) + "退" + str(x2)
         return c
+
+
+class Chessman:
+    """棋子"""
+
+    def __init__(self, name, image, coordinate, x_y):
+        self.name = name
+        self.image = image
+        self.coordinate = coordinate  # 棋子的棋盘坐标
+        self.x_y = x_y  # 棋盘坐标和像素坐标对照表
+
+    @property
+    def pixel_coordinate(self):
+        """棋子在棋盘的像素坐标"""
+        return [self.x_y[0][self.coordinate[0]], self.x_y[1][self.coordinate[1]]]
+
+
+class Engine:
+
+    @staticmethod
+    def calculate_coordinate(chess_manual_all):
+
+        return random.choice(list(chess_manual_all.keys()))
 
     @staticmethod
     def one_hot(feature, player):
@@ -338,13 +357,13 @@ class Checkerboard:
         else:
             return [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    @staticmethod
-    def demo():
+    @classmethod
+    def demo(cls):
         initial_chess_manual = {}
         for chess in Checkerboard.XinJv:
             initial_chess_manual[Checkerboard.player_coordinate_convert("盘转黑", chess[-2:], True)] = chess[0]
 
-        train_samples = Checkerboard.simulation_chess(initial_chess_manual, "红黑")
+        train_samples = Engine.simulation_chess(initial_chess_manual, "红黑")
         print("================")
         return train_samples
 
@@ -370,16 +389,16 @@ class Checkerboard:
                         sample = []  # 将每种可能的走法局面以独热编码形式保存
                         for j in range(1, 11):
                             for i in range(1, 10):
-                                sample.append(Checkerboard.one_hot(chess_manual_clone.get((i, j)), player[0]))
+                                sample.append(Engine.one_hot(chess_manual_clone.get((i, j)), player[0]))
                         chess_manual_all[(chess, coordinate)] = sample
             if chess_manual_all:
-                move_chess = Checkerboard.calculate_coordinate(chess_manual_all)  # 选择走法
+                move_chess = Engine.calculate_coordinate(chess_manual_all)  # 选择走法
                 chess_manual[move_chess[1]] = chess_manual[move_chess[0]]  # 走棋
                 chess_manual.pop(move_chess[0])
                 sample = []
                 for j in range(1, 11):
                     for i in range(1, 10):
-                        sample.append(Checkerboard.one_hot(chess_manual.get((i, j)), player[0]))
+                        sample.append(Engine.one_hot(chess_manual.get((i, j)), player[0]))
                 sample.append(player[0])
                 simulation.append(sample)  # 保存走法
                 player = player[::-1]
@@ -410,21 +429,6 @@ class Checkerboard:
                     sample[-1] = [1, 0, 0]
                 break
         return simulation
-
-
-class Chessman:
-    """棋子"""
-
-    def __init__(self, name, image, coordinate, x_y):
-        self.name = name
-        self.image = image
-        self.coordinate = coordinate  # 棋子的棋盘坐标
-        self.x_y = x_y  # 棋盘坐标和像素坐标对照表
-
-    @property
-    def pixel_coordinate(self):
-        """棋子在棋盘的像素坐标"""
-        return [self.x_y[0][self.coordinate[0]], self.x_y[1][self.coordinate[1]]]
 
 
 if __name__ == '__main__':

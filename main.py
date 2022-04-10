@@ -345,8 +345,8 @@ class Checkerboard:
             initial_chess_manual[Checkerboard.player_coordinate_convert("盘转黑", chess[-2:], True)] = chess[0]
 
         train_samples = Checkerboard.simulation_chess(initial_chess_manual, "红黑")
-        print(train_samples)
-        # return train_samples
+        print("================")
+        return train_samples
 
     @staticmethod
     def simulation_chess(chess_manual, player):
@@ -367,7 +367,11 @@ class Checkerboard:
                         chess_manual_clone = chess_manual.copy()
                         chess_manual_clone[coordinate] = chess_manual_clone[chess]
                         chess_manual_clone.pop(chess)
-                        chess_manual_all[(chess, coordinate)] = chess_manual_clone
+                        sample = []  # 将每种可能的走法局面以独热编码形式保存
+                        for j in range(1, 11):
+                            for i in range(1, 10):
+                                sample.append(Checkerboard.one_hot(chess_manual_clone.get((i, j)), player[0]))
+                        chess_manual_all[(chess, coordinate)] = sample
             if chess_manual_all:
                 move_chess = Checkerboard.calculate_coordinate(chess_manual_all)  # 选择走法
                 chess_manual[move_chess[1]] = chess_manual[move_chess[0]]  # 走棋

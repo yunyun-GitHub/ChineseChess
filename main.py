@@ -357,14 +357,17 @@ class Engine:
         else:
             return [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    @classmethod
-    def demo(cls):
+    @staticmethod
+    def demo():
         initial_chess_manual = {}
         for chess in Checkerboard.XinJv:
             initial_chess_manual[Checkerboard.player_coordinate_convert("盘转黑", chess[-2:], True)] = chess[0]
 
         train_samples = Engine.simulation_chess(initial_chess_manual, "红黑")
+        # for s in train_samples:
+        #     print(s)
         print("================")
+
         return train_samples
 
     @staticmethod
@@ -395,10 +398,7 @@ class Engine:
                 move_chess = Engine.calculate_coordinate(chess_manual_all)  # 选择走法
                 chess_manual[move_chess[1]] = chess_manual[move_chess[0]]  # 走棋
                 chess_manual.pop(move_chess[0])
-                sample = []
-                for j in range(1, 11):
-                    for i in range(1, 10):
-                        sample.append(Engine.one_hot(chess_manual.get((i, j)), player[0]))
+                sample = chess_manual_all[move_chess]  # 这三行不能合并成一行simulation.append(chess_manual_all[move_chess].append(player[0]))
                 sample.append(player[0])
                 simulation.append(sample)  # 保存走法
                 player = player[::-1]

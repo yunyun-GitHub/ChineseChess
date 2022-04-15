@@ -32,7 +32,7 @@ class Checkerboard:
         self.button_image = pygame.image.load("image/按钮.png")  # 按钮
         self.x_y = [[33, 93, 153, 214, 273, 333, 393, 453, 511], [6, 65, 125, 186, 246, 306, 365, 426, 485, 544]]
         self.checked_of_chess = None  # 默认没有棋子被选中
-        self.chess_player = "红黑"  # 走棋玩家，默认红方先走
+        self.chess_player = "黑红"  # 走棋玩家，默认红方先走
         self.player_pos = True  # 表示黑棋在上红棋在下
         self.end = False
         self.dots_coordinate = [580, 291]
@@ -391,7 +391,8 @@ class Engine:
                     chess_manual_all.append(sample)
                     move_chess_all.append((chess, coordinate))
         if chess_manual_all:
-            predict = Engine.model.predict(tf.cast(chess_manual_all, tf.int16))
+            chess_manual_all = tf.cast(chess_manual_all, tf.int16)
+            predict = Engine.model.predict(chess_manual_all)
             y_pred = np.argmax(predict, axis=1)
             if 1 in y_pred:
                 index = np.where(y_pred == 1)[0]
@@ -408,7 +409,8 @@ class Engine:
 
     @staticmethod
     def calculate_coordinate(move_chess_all, chess_manual_all):
-        predict = Engine.model.predict(tf.cast(chess_manual_all, tf.int16))
+        chess_manual_all = tf.cast(chess_manual_all, tf.int16)
+        predict = Engine.model.predict(chess_manual_all)
         y_pred = np.argmax(predict, axis=1)
         if 1 in y_pred:
             index = np.where(y_pred == 1)[0]
@@ -416,8 +418,7 @@ class Engine:
         else:
             a = random.randint(0, len(move_chess_all) - 1)
         move_chess = move_chess_all[a]
-        chess_manual = chess_manual_all[a]
-        return move_chess, chess_manual
+        return move_chess
 
     @staticmethod
     def one_hot(feature, player):
@@ -435,11 +436,15 @@ class Engine:
         time_train = time.time()
         while Engine.test:
             time_start = time.time()
-            train_samples = Engine.simulation_chess(Engine.initial_chess_manual, "红黑")
+            train_samples = []
+            while len(train_samples) < 1350:
+                train = Engine.simulation_chess(Engine.initial_chess_manual, "红黑")
+                train_samples.extend(train)
             train_samples = np.array(train_samples)
-            x_train, y_train = tf.cast(train_samples[:, :-1], tf.int16), tf.cast(train_samples[:, -1, :3], tf.int16)
+            x_train, y_train = tf.cast(train_samples[:, :-1], tf.int16), tf.cast(train_samples[:, -1, 0], tf.int16)
             for i in range(10):
-                Engine.model.train_on_batch(x_train, y_train)  # 训练模型
+                loss = Engine.model.train_on_batch(x_train, y_train)  # 训练模型
+                print(loss)
             time_end = time.time()
             print("======", len(y_train), "=======")
             print('time: ', time_end - time_start, 'train_time:', time_end - time_train)
@@ -449,8 +454,10 @@ class Engine:
         print("训练结束，模型已保存")
 
     @staticmethod
-    def simulation_chess(chess_manual, player):
+    def simulation_chess(chess_manual_initial, player_initial):
         """模拟下完一整盘棋，以独热编码形式返回每步局面以及胜负"""
+        player = player_initial
+        chess_manual = chess_manual_initial.copy()
         num = 0
         chess_num = len(chess_manual)
         besieged = None
@@ -472,29 +479,29 @@ class Engine:
                         chess_manual_all.append(sample)
                         move_chess_all.append((chess, coordinate))
             if chess_manual_all:
-                move_chess, sample = Engine.calculate_coordinate(move_chess_all, chess_manual_all)  # 选择走法
+                move_chess = Engine.calculate_coordinate(move_chess_all, chess_manual_all)  # 选择走法
                 chess_manual[move_chess[1]] = chess_manual[move_chess[0]]  # 走棋
                 chess_manual.pop(move_chess[0])
+                sample = []  # 将每种可能的走法局面以独热编码形式保存
+                for j in range(1, 11):
+                    for i in range(1, 10):
+                        sample.append(Engine.one_hot(chess_manual.get((i, j)), player[0]))
                 if player[0] == "红":
                     simulation.append(sample)  # 保存走法
                 elif player[0] == "黑":
                     simulation2.append(sample)
-
                 m = {}
                 for chess in chess_manual:
                     m[(10 - chess[0], 11 - chess[1])] = chess_manual[chess]
                 chess_manual = m
-
                 sample = []  # 将每种可能的走法局面以独热编码形式保存
                 for j in range(1, 11):
                     for i in range(1, 10):
                         sample.append(Engine.one_hot(chess_manual.get((i, j)), player[1]))
-
                 if player[1] == "红":
                     simulation.append(sample)  # 保存走法
                 elif player[1] == "黑":
                     simulation2.append(sample)
-
                 if len(chess_manual) == chess_num:
                     num += 1
                 else:
@@ -505,24 +512,26 @@ class Engine:
                 player = player[::-1]
             else:
                 besieged = player[0]  # 困毙
-
             if "黑将" not in chess_manual.values() or besieged == "黑":
                 for sample in simulation:
-                    sample.append([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                    sample.append([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
                 for sample in simulation2:
-                    sample.append([0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                    sample.append([2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                print("红胜")
                 break
             if "红帅" not in chess_manual.values() or besieged == "红":
                 for sample in simulation:
-                    sample.append([0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                    sample.append([2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
                 for sample in simulation2:
-                    sample.append([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                    sample.append([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                print("黑胜")
                 break
             if num >= 50:
                 for sample in simulation:
-                    sample.append([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                    sample.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
                 for sample in simulation2:
-                    sample.append([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                    sample.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                print("和棋")
                 break
         simulation.extend(simulation2)
         return simulation

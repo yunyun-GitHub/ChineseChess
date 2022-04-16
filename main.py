@@ -32,7 +32,7 @@ class Checkerboard:
         self.button_image = pygame.image.load("image/按钮.png")  # 按钮
         self.x_y = [[33, 93, 153, 214, 273, 333, 393, 453, 511], [6, 65, 125, 186, 246, 306, 365, 426, 485, 544]]
         self.checked_of_chess = None  # 默认没有棋子被选中
-        self.chess_player = "黑红"  # 走棋玩家，默认红方先走
+        self.chess_player = "红黑"  # 走棋玩家，默认红方先走
         self.player_pos = True  # 表示黑棋在上红棋在下
         self.end = False
         self.dots_coordinate = [580, 291]
@@ -141,9 +141,16 @@ class Checkerboard:
         for i in self.chess_manual:
             m[Checkerboard.player_coordinate_convert("盘转" + self.chess_player[0], i, self.player_pos)] = self.chess_manual[i].name
 
-        move_chess = Engine.connector(m, self.chess_player[0])
+        nm = {}
+        b = list(m.keys())
+        random.shuffle(b)
+        # b.sort()
+        for i in b:
+            nm[i] = m[i]
+
+        move_chess = Engine.connector(nm, self.chess_player[0])
         print(move_chess)
-        print(Checkerboard.translate_move_chess(move_chess, m[move_chess[0]][-1]))
+        print(Checkerboard.translate_move_chess(move_chess, nm[move_chess[0]][-1]))
         chess = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[0], self.player_pos)
         coordinate = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[1], self.player_pos)
         self.move_chess(self.chess_manual[chess], coordinate)
@@ -393,6 +400,7 @@ class Engine:
         if chess_manual_all:
             chess_manual_all = tf.cast(chess_manual_all, tf.int16)
             predict = Engine.model.predict(chess_manual_all)
+            # predict = Engine.model.predict_on_batch(chess_manual_all)
             y_pred = np.argmax(predict, axis=1)
             if 1 in y_pred:
                 index = np.where(y_pred == 1)[0]
@@ -436,15 +444,10 @@ class Engine:
         time_train = time.time()
         while Engine.test:
             time_start = time.time()
-            train_samples = []
-            while len(train_samples) < 1350:
-                train = Engine.simulation_chess(Engine.initial_chess_manual, "红黑")
-                train_samples.extend(train)
+            train_samples = Engine.simulation_chess(Engine.initial_chess_manual, "红黑")
             train_samples = np.array(train_samples)
             x_train, y_train = tf.cast(train_samples[:, :-1], tf.int16), tf.cast(train_samples[:, -1, 0], tf.int16)
-            for i in range(10):
-                loss = Engine.model.train_on_batch(x_train, y_train)  # 训练模型
-                print(loss)
+            Engine.model.fit(x_train, y_train, epochs=5, batch_size=32)  # 训练模型
             time_end = time.time()
             print("======", len(y_train), "=======")
             print('time: ', time_end - time_start, 'train_time:', time_end - time_train)

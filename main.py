@@ -28,15 +28,17 @@ class Checkerboard:
         self.checkerboard_image = pygame.image.load("image/棋盘.png")  # 加载棋盘图片
         self.checked_image = pygame.image.load("image/选中.png")  # 加载选中图片
         self.move_chess_image = pygame.image.load("image/落子.png")  # 加载落子图片
-        self.dots_image = pygame.image.load("image/圆点.png")  # 加载圆点图片
         self.button_image = pygame.image.load("image/按钮.png")  # 按钮
         self.x_y = [[33, 93, 153, 214, 273, 333, 393, 453, 511], [6, 65, 125, 186, 246, 306, 365, 426, 485, 544]]
         self.checked_of_chess = None  # 默认没有棋子被选中
         self.chess_player = "红黑"  # 走棋玩家，默认红方先走
+        self.move_what = None
         self.player_pos = True  # 表示黑棋在上红棋在下
         self.end = False
-        self.dots_coordinate = [580, 291]
-        self.button_coordinate = [580, 271]
+        self.button_coordinate0 = [580, 251]
+        self.button_coordinate1 = [580, 271]
+        self.button_coordinate2 = [580, 291]
+        self.button_coordinate3 = [580, 311]
         self.move_chess_track = [None, None]  # 落子轨迹，为两个棋盘坐标，默认为空
         self.last_mouse_coordinate = (None, None)  # 上次鼠标点击的棋盘坐标，默认为空
         self.chess_manual = {}  # 保存棋子
@@ -66,8 +68,11 @@ class Checkerboard:
         if self.move_chess_track != [None, None]:  # 画落子效果
             self.screen.blit(self.move_chess_image, self.move_chess_track[0])
             self.screen.blit(self.move_chess_image, self.move_chess_track[1])
-        self.screen.blit(self.dots_image, self.dots_coordinate)  # 画圆点
-        self.screen.blit(self.button_image, self.button_coordinate)
+        self.screen.blit(self.button_image, self.button_coordinate0)  # 画圆点
+        self.screen.blit(self.button_image, self.button_coordinate1)
+        self.screen.blit(self.button_image, self.button_coordinate2)
+        self.screen.blit(self.button_image, self.button_coordinate3)
+        self.screen.blit(self.font.render(self.move_what, True, (0, 0, 0)), (558, 273))  # 显示走棋
         self.screen.blit(self.font.render(self.chess_player[0] + "方走", True, (0, 0, 0)), (558, 293))  # 显示走棋棋手
 
     def process_events(self):
@@ -79,23 +84,38 @@ class Checkerboard:
                 exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # 只有鼠标左键按下才会更新
-                    if self.dots_coordinate[0] < event.pos[0] < self.dots_coordinate[0] + 18 and \
-                            self.dots_coordinate[1] < event.pos[1] < self.dots_coordinate[1] + 18:
-                        # self.flip_board()  # 翻转棋盘
-                        if Engine.test:
-                            Engine.test = False
-                            print("正在结束，请稍等。。。")
-                        elif len(threading.enumerate()) <= 1:
-                            Engine.test = True
-                            t = threading.Thread(target=Engine.demo)
-                            t.start()  # 启动线程，即让线程开始执行
-
-                    elif self.button_coordinate[0] < event.pos[0] < self.button_coordinate[0] + 18 and \
-                            self.button_coordinate[1] < event.pos[1] < self.button_coordinate[1] + 18 and self.end is False:
-                        self.computer_think()
-                    elif self.end is False:
-                        self.update_checkerboard_state(self.translate_coordinate(event.pos))  # 更新棋盘状态属性
+                    self.button_event(event)
                     break
+
+    def button_event(self, event):
+        if self.button_coordinate0[0] < event.pos[0] < self.button_coordinate0[0] + 18 and \
+                self.button_coordinate0[1] < event.pos[1] < self.button_coordinate0[1] + 18:
+            if Engine.test:
+                Engine.test = False
+                print("正在结束，请稍等。。。")
+            elif len(threading.enumerate()) <= 0:
+                Engine.test = True
+                t = threading.Thread(target=Engine.demo)
+                t.start()  # 启动线程，即让线程开始执行
+        elif self.button_coordinate1[0] < event.pos[0] < self.button_coordinate1[0] + 18 and \
+                self.button_coordinate1[1] < event.pos[1] < self.button_coordinate1[1] + 18:
+            self.flip_board()  # 翻转棋盘
+        elif self.button_coordinate2[0] < event.pos[0] < self.button_coordinate2[0] + 18 and \
+                self.button_coordinate2[1] < event.pos[1] < self.button_coordinate2[1] + 18 and self.end is False:
+            self.computer_think()
+        elif self.button_coordinate3[0] < event.pos[0] < self.button_coordinate3[0] + 18 and \
+                self.button_coordinate3[1] < event.pos[1] < self.button_coordinate3[1] + 18:
+            self.chess_manual = {}  # 保存棋子
+            self.create_chess()  # 创建棋子
+            self.checked_of_chess = None  # 默认没有棋子被选中
+            self.chess_player = "红黑"  # 走棋玩家，默认红方先走
+            self.end = False
+            self.move_what = None
+            self.player_pos = True  # 表示黑棋在上红棋在下
+            self.move_chess_track = [None, None]  # 落子轨迹，为两个棋盘坐标，默认为空
+            self.last_mouse_coordinate = (None, None)  # 上次鼠标点击的棋盘坐标，默认为空
+        elif self.end is False:
+            self.update_checkerboard_state(self.translate_coordinate(event.pos))  # 更新棋盘状态属性
 
     def update_checkerboard_state(self, now_mouse_coordinate):
         """接收鼠标点击的棋盘坐标，更新棋盘状态属性，判断是要走棋还是要干什么"""
@@ -116,8 +136,10 @@ class Checkerboard:
         for i in self.chess_manual:
             m[Checkerboard.player_coordinate_convert("盘转" + self.chess_player[0], i, self.player_pos)] = self.chess_manual[i].name
 
-        if Checkerboard.player_coordinate_convert("盘转" + self.chess_player[0], coordinate, self.player_pos) in Checkerboard.may_coordinate(
-                Checkerboard.player_coordinate_convert("盘转" + self.chess_player[0], chess.coordinate, self.player_pos), m):
+        player_chess = Checkerboard.player_coordinate_convert("盘转" + self.chess_player[0], chess.coordinate, self.player_pos)
+        player_coordinate = Checkerboard.player_coordinate_convert("盘转" + self.chess_player[0], coordinate, self.player_pos)
+        if player_coordinate in Checkerboard.may_coordinate(player_chess, m):
+            self.move_what = Checkerboard.translate_move_chess((player_chess, player_coordinate), chess.name[-1])
             self.move_chess_track[0] = chess.pixel_coordinate  # 更新落子轨迹
             self.chess_manual[coordinate] = chess
             self.chess_manual.pop(chess.coordinate)
@@ -149,8 +171,6 @@ class Checkerboard:
             nm[i] = m[i]
 
         move_chess = Engine.connector(nm, self.chess_player[0])
-        print(move_chess)
-        print(Checkerboard.translate_move_chess(move_chess, nm[move_chess[0]][-1]))
         chess = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[0], self.player_pos)
         coordinate = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[1], self.player_pos)
         self.move_chess(self.chess_manual[chess], coordinate)

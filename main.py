@@ -1,3 +1,4 @@
+import os
 import random
 import pygame
 import numpy as np
@@ -43,6 +44,7 @@ class Checkerboard:
         self.last_mouse_coordinate = (None, None)  # 上次鼠标点击的棋盘坐标，默认为空
         self.chess_manual = {}  # 保存棋子
         self.create_chess()  # 创建棋子
+        self.engine = Engine()  # 创建引擎
 
     def create_chess(self):
         """创建棋子"""
@@ -90,22 +92,23 @@ class Checkerboard:
     def button_event(self, event):
         if self.button_coordinate0[0] < event.pos[0] < self.button_coordinate0[0] + 18 and \
                 self.button_coordinate0[1] < event.pos[1] < self.button_coordinate0[1] + 18:
-            if Engine.test:
-                Engine.test = False
+            if self.engine.start_train:
+                self.engine.start_train = False
                 print("正在结束，请稍等。。。")
-            elif len(threading.enumerate()) <= 0:
-                Engine.test = True
-                t = threading.Thread(target=Engine.demo)
+            elif len(threading.enumerate()) <= 1:
+                self.engine.start_train = True
+                t = threading.Thread(target=self.engine.train_model)
                 t.start()  # 启动线程，即让线程开始执行
         elif self.button_coordinate1[0] < event.pos[0] < self.button_coordinate1[0] + 18 and \
                 self.button_coordinate1[1] < event.pos[1] < self.button_coordinate1[1] + 18:
             self.flip_board()  # 翻转棋盘
         elif self.button_coordinate2[0] < event.pos[0] < self.button_coordinate2[0] + 18 and \
                 self.button_coordinate2[1] < event.pos[1] < self.button_coordinate2[1] + 18 and self.end is False:
-            self.computer_think()
+            self.computer_think()  # 电脑思考
         elif self.button_coordinate3[0] < event.pos[0] < self.button_coordinate3[0] + 18 and \
                 self.button_coordinate3[1] < event.pos[1] < self.button_coordinate3[1] + 18:
-            self.chess_manual = {}  # 保存棋子
+            # 开始新局,将各个属性恢复默认
+            self.chess_manual = {}  # 清空棋子
             self.create_chess()  # 创建棋子
             self.checked_of_chess = None  # 默认没有棋子被选中
             self.chess_player = "红黑"  # 走棋玩家，默认红方先走
@@ -170,7 +173,7 @@ class Checkerboard:
         for i in b:
             nm[i] = m[i]
 
-        move_chess = Engine.connector(nm, self.chess_player[0])
+        move_chess = self.engine.connector(nm, self.chess_player[0])
         chess = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[0], self.player_pos)
         coordinate = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[1], self.player_pos)
         self.move_chess(self.chess_manual[chess], coordinate)
@@ -377,31 +380,74 @@ class Chessman:
 
 
 class Engine:
+    """引擎"""
 
-    test = False
-    r = {"红车": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红马": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-         "红砲": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红相": [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-         "红仕": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红帅": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-         "红兵": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], "黑车": [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-         "黑马": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], "黑炮": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-         "黑象": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], "黑士": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-         "黑将": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], "黑卒": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]}
-    b = {"黑车": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "黑马": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-         "黑炮": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "黑象": [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-         "黑士": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], "黑将": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-         "黑卒": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], "红车": [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-         "红马": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], "红砲": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-         "红相": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], "红仕": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-         "红帅": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], "红兵": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]}
-    z = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    # 直接加载模型
-    model = tf.keras.models.load_model("chess_model.h5")
-    initial_chess_manual = {}
-    for chess in Checkerboard.XinJv:
-        initial_chess_manual[Checkerboard.player_coordinate_convert("盘转红", chess[-2:], True)] = chess[0]
+    def __init__(self):
+        self.chess_model = self.create_model()  # 创建模型
+        self.chess_loss_func = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)  # 损失函数
+        self.chess_optimizer = tf.keras.optimizers.Adam()  # 优化器
+        # 定义检查点
+        self.checkpoint_dir = './training_checkpoints'
+        self.checkpoint = tf.train.Checkpoint(chess_optimizer=self.chess_optimizer, chess_model=self.chess_model)
+        # 如有需要（在训练前），恢复最新的检查点
+        self.checkpoint.restore(tf.train.latest_checkpoint(self.checkpoint_dir))
 
-    @classmethod
-    def connector(cls, chess_manual, player):
+        self.start_train = False
+        self.r = {"红车": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红马": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                  "红砲": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红相": [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                  "红仕": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红帅": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                  "红兵": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], "黑车": [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+                  "黑马": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], "黑炮": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                  "黑象": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], "黑士": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+                  "黑将": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], "黑卒": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                  None: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+        self.b = {"黑车": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "黑马": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                  "黑炮": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "黑象": [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                  "黑士": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], "黑将": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                  "黑卒": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], "红车": [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+                  "红马": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], "红砲": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                  "红相": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], "红仕": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+                  "红帅": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0], "红兵": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                  None: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+        self.initial_chess_manual = {}
+        for chess in Checkerboard.XinJv:
+            self.initial_chess_manual[Checkerboard.player_coordinate_convert("盘转红", chess[-2:], True)] = chess[0]
+
+    @staticmethod
+    def create_model():
+        """构建模型"""
+        model = tf.keras.Sequential([
+            # 特征提取层1
+            tf.keras.layers.Conv2D(16, kernel_size=(3, 3), padding="same", activation=tf.nn.relu, input_shape=(10, 9, 15)),
+            tf.keras.layers.Conv2D(16, kernel_size=(3, 3), padding="same", activation=tf.nn.relu),
+            tf.keras.layers.MaxPool2D(pool_size=(2, 2)),
+            tf.keras.layers.Dropout(0.2),
+
+            # 特征提取层2
+            tf.keras.layers.Conv2D(32, kernel_size=(3, 3), padding="same", activation=tf.nn.relu),
+            tf.keras.layers.Conv2D(32, kernel_size=(3, 3), padding="same", activation=tf.nn.relu),
+            tf.keras.layers.MaxPool2D(pool_size=(2, 2)),
+            tf.keras.layers.Dropout(0.2),
+
+            # 特征提取层3
+            tf.keras.layers.Conv2D(64, kernel_size=(3, 3), padding="same", activation=tf.nn.relu),
+            tf.keras.layers.Conv2D(64, kernel_size=(3, 3), padding="same", activation=tf.nn.relu),
+            tf.keras.layers.MaxPool2D(pool_size=(2, 2)),
+            tf.keras.layers.Dropout(0.2),
+
+            # 全连接层
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dropout(0.2),
+            tf.keras.layers.Dense(128, activation="relu"),
+            tf.keras.layers.Dense(128, activation="relu"),
+            tf.keras.layers.Dense(128, activation="relu"),
+            tf.keras.layers.Dense(128, activation="relu"),
+            tf.keras.layers.Dropout(0.2),
+            tf.keras.layers.Dense(3, activation="softmax")
+        ])
+        return model
+
+    def connector(self, chess_manual, player):
         """接口程序"""
         chess_manual_all = []  # 储存当前局面下的所有走法的局面
         move_chess_all = []
@@ -411,16 +457,12 @@ class Engine:
                     chess_manual_clone = chess_manual.copy()
                     chess_manual_clone[coordinate] = chess_manual_clone[chess]
                     chess_manual_clone.pop(chess)
-                    sample = []  # 将每种可能的走法局面以独热编码形式保存
-                    for j in range(1, 11):
-                        for i in range(1, 10):
-                            sample.append(Engine.one_hot(chess_manual_clone.get((i, j)), player[0]))
+                    sample = self.one_hot_chess_manual(chess_manual_clone, player[0])  # 将每种可能的走法局面以独热编码形式保存
                     chess_manual_all.append(sample)
                     move_chess_all.append((chess, coordinate))
         if chess_manual_all:
             chess_manual_all = tf.cast(chess_manual_all, tf.int16)
-            predict = Engine.model.predict(chess_manual_all)
-            # predict = Engine.model.predict_on_batch(chess_manual_all)
+            predict = np.array(self.chess_model(chess_manual_all))
             y_pred = np.argmax(predict, axis=1)
             if 1 in y_pred:
                 index = np.where(y_pred == 1)[0]
@@ -435,10 +477,9 @@ class Engine:
             move_chess = None
         return move_chess
 
-    @staticmethod
-    def calculate_coordinate(move_chess_all, chess_manual_all):
+    def calculate_coordinate(self, move_chess_all, chess_manual_all):
         chess_manual_all = tf.cast(chess_manual_all, tf.int16)
-        predict = Engine.model.predict(chess_manual_all)
+        predict = np.array(self.chess_model(chess_manual_all))
         y_pred = np.argmax(predict, axis=1)
         if 1 in y_pred:
             index = np.where(y_pred == 1)[0]
@@ -448,36 +489,23 @@ class Engine:
         move_chess = move_chess_all[a]
         return move_chess
 
-    @staticmethod
-    def one_hot(feature, player):
-        if feature:
-            if player == "红":
-                return Engine.r[feature]
-            elif player == "黑":
-                return Engine.b[feature]
-        else:
-            return Engine.z
+    def one_hot_chess_manual(self, chess_manual, player):
+        sample = []  # 将每种可能的走法局面以独热编码形式保存
+        if player == "红":
+            for j in range(1, 11):
+                row = []
+                for i in range(1, 10):
+                    row.append(self.r[chess_manual.get((i, j))])
+                sample.append(row)
+        elif player == "黑":
+            for j in range(1, 11):
+                row = []
+                for i in range(1, 10):
+                    row.append(self.b[chess_manual.get((i, j))])
+                sample.append(row)
+        return sample
 
-    @classmethod
-    def demo(cls):
-        print("训练开始...")
-        time_train = time.time()
-        while Engine.test:
-            time_start = time.time()
-            train_samples = Engine.simulation_chess(Engine.initial_chess_manual, "红黑")
-            train_samples = np.array(train_samples)
-            x_train, y_train = tf.cast(train_samples[:, :-1], tf.int16), tf.cast(train_samples[:, -1, 0], tf.int16)
-            Engine.model.fit(x_train, y_train, epochs=5, batch_size=32)  # 训练模型
-            time_end = time.time()
-            print("======", len(y_train), "=======")
-            print('time: ', time_end - time_start, 'train_time:', time_end - time_train)
-
-        # 保存模型
-        Engine.model.save("chess_model.h5")
-        print("训练结束，模型已保存")
-
-    @staticmethod
-    def simulation_chess(chess_manual_initial, player_initial):
+    def simulation_chess(self, chess_manual_initial, player_initial):
         """模拟下完一整盘棋，以独热编码形式返回每步局面以及胜负"""
         player = player_initial
         chess_manual = chess_manual_initial.copy()
@@ -495,36 +523,31 @@ class Engine:
                         chess_manual_clone = chess_manual.copy()
                         chess_manual_clone[coordinate] = chess_manual_clone[chess]
                         chess_manual_clone.pop(chess)
-                        sample = []  # 将每种可能的走法局面以独热编码形式保存
-                        for j in range(1, 11):
-                            for i in range(1, 10):
-                                sample.append(Engine.one_hot(chess_manual_clone.get((i, j)), player[0]))
+                        sample = self.one_hot_chess_manual(chess_manual_clone, player[0])  # 将每种可能的走法局面以独热编码形式保存
                         chess_manual_all.append(sample)
                         move_chess_all.append((chess, coordinate))
             if chess_manual_all:
-                move_chess = Engine.calculate_coordinate(move_chess_all, chess_manual_all)  # 选择走法
+                move_chess = self.calculate_coordinate(move_chess_all, chess_manual_all)  # 选择走法
                 chess_manual[move_chess[1]] = chess_manual[move_chess[0]]  # 走棋
                 chess_manual.pop(move_chess[0])
-                sample = []  # 将每种可能的走法局面以独热编码形式保存
-                for j in range(1, 11):
-                    for i in range(1, 10):
-                        sample.append(Engine.one_hot(chess_manual.get((i, j)), player[0]))
+
+                sample = self.one_hot_chess_manual(chess_manual, player[0])  # 将每种可能的走法局面以独热编码形式保存
                 if player[0] == "红":
                     simulation.append(sample)  # 保存走法
                 elif player[0] == "黑":
                     simulation2.append(sample)
+
                 m = {}
                 for chess in chess_manual:
                     m[(10 - chess[0], 11 - chess[1])] = chess_manual[chess]
                 chess_manual = m
-                sample = []  # 将每种可能的走法局面以独热编码形式保存
-                for j in range(1, 11):
-                    for i in range(1, 10):
-                        sample.append(Engine.one_hot(chess_manual.get((i, j)), player[1]))
+
+                sample = self.one_hot_chess_manual(chess_manual, player[1])  # 将每种可能的走法局面以独热编码形式保存
                 if player[1] == "红":
                     simulation.append(sample)  # 保存走法
                 elif player[1] == "黑":
                     simulation2.append(sample)
+
                 if len(chess_manual) == chess_num:
                     num += 1
                 else:
@@ -536,28 +559,53 @@ class Engine:
             else:
                 besieged = player[0]  # 困毙
             if "黑将" not in chess_manual.values() or besieged == "黑":
-                for sample in simulation:
-                    sample.append([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-                for sample in simulation2:
-                    sample.append([2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                simulation_labels = [1] * len(simulation)
+                simulation2_labels = [2] * len(simulation2)
                 print("红胜")
                 break
             if "红帅" not in chess_manual.values() or besieged == "红":
-                for sample in simulation:
-                    sample.append([2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-                for sample in simulation2:
-                    sample.append([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                simulation_labels = [2] * len(simulation)
+                simulation2_labels = [1] * len(simulation2)
                 print("黑胜")
                 break
             if num >= 50:
-                for sample in simulation:
-                    sample.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-                for sample in simulation2:
-                    sample.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                simulation_labels = [0] * len(simulation)
+                simulation2_labels = [0] * len(simulation2)
                 print("和棋")
                 break
+        simulation_labels.extend(simulation2_labels)
         simulation.extend(simulation2)
-        return simulation
+        simulation, simulation_labels = np.array(simulation), np.array(simulation_labels)
+        return simulation, simulation_labels
+
+    # 注意`tf.function`的使用，该注解使函数被“编译”为计算图模式
+    @tf.function
+    def train_model_step(self, samples, labels):
+        """一个批次的训练"""
+        with tf.GradientTape() as chess_tape:
+            chess_pred = self.chess_model(samples, training=True)
+            chess_loss = self.chess_loss_func(labels, chess_pred)
+
+        gradients_of_chess = chess_tape.gradient(chess_loss, self.chess_model.trainable_variables)
+        self.chess_optimizer.apply_gradients(zip(gradients_of_chess, self.chess_model.trainable_variables))
+
+    def train_model(self):
+        print("训练开始...")
+        time_train = time.time()
+        while self.start_train:
+            time_start = time.time()
+            trains, labels = self.simulation_chess(self.initial_chess_manual, "红黑")  # 获取训练数据
+            shuffle_ix = np.random.permutation(np.arange(len(labels)))  # 同时打乱数据和标签
+            trains = trains[shuffle_ix]
+            labels = labels[shuffle_ix]
+            trains, labels = tf.cast(trains, tf.int16), tf.cast(labels, tf.int16)
+            self.train_model_step(trains, labels)  # 训练模型
+            time_end = time.time()
+            print('time: ', time_end - time_start, 'train_time:', time_end - time_train)
+        current_time = time.strftime('%Y-%m-%d_%H：%M：%S', time.localtime(time.time()))  # 获取当前时间
+        checkpoint_prefix = os.path.join(self.checkpoint_dir, current_time)  # 拼接文件名
+        self.checkpoint.save(file_prefix=checkpoint_prefix)  # 保存模型
+        print("训练结束，模型已保存")
 
 
 if __name__ == '__main__':

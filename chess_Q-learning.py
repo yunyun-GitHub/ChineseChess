@@ -497,22 +497,6 @@ class Engine:
                 sample.append(row)
         return sample
 
-    @staticmethod
-    def is_failed(chess_manual, player):
-        if player == '红':
-            general = '红帅'
-        else:
-            general = '黑将'
-
-        if general not in chess_manual.values():
-            return True
-        else:
-            for chess in chess_manual:
-                if chess_manual[chess][0] == player:
-                    if Checkerboard.may_coordinate(chess, chess_manual):
-                        return False
-            return True
-
     def reward(self, chess_manual, player, num):
         if player == '红黑':
             general, enemy_general = '红帅', '黑将'
@@ -576,7 +560,7 @@ class Engine:
                 num += 1
             else:
                 num, chess_num = 0, len(chess_manual)
-            if train.count(train[-1]) >= 3:
+            if trains.count(trains[-1]) >= 3:
                 num = 50
             reward, unterminated, chess_manual, move_chess_all, chess_manual_all, victory_or_defeat = self.reward(chess_manual, player, num)
 

@@ -389,9 +389,10 @@ class Engine:
         # 定义检查点
         self.checkpoint_dir = './DQN_checkpoints'
         self.checkpoint = tf.train.Checkpoint(chess_optimizer=self.chess_optimizer, chess_model=self.chess_model)
-        # 如有需要（在训练前），恢复最新的检查点
-        self.checkpoint.restore(tf.train.latest_checkpoint(self.checkpoint_dir))
-
+        if os.path.exists(self.checkpoint_dir):  # 如有需要（在训练前），恢复最新的检查点
+            self.checkpoint.restore(tf.train.latest_checkpoint(self.checkpoint_dir))
+        else:
+            print('未检测到模型数据')
         self.start_train = False
         self.r = {"红车": [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红马": [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                   "红砲": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "红相": [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],

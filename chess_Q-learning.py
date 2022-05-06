@@ -452,17 +452,24 @@ class Engine:
         """接口程序"""
         move_chess_all, chess_manual_all = self.chess_manual_all(chess_manual, player)
         predict = self.chess_model(tf.cast(chess_manual_all, tf.int16))
-        print(predict)
         move_chess = move_chess_all[np.argmax(predict)]
+        print(np.max(predict))
         return move_chess
 
-    def choose_action(self, move_chess_all, chess_manual_all):
-        """90%的情况下选择价值最大的，10%的情况下随机选择"""
-        if np.random.uniform() > 0.9:
+    def choose_action(self, move_chess_all, chess_manual_all, move_chess):
+        """如果有杀棋直接杀，否则90%的情况下选择价值最大的，10%的情况下随机选择"""
+        if move_chess:
+            return move_chess
+
+        predict = self.chess_model(tf.cast(chess_manual_all, tf.int16))
+        d = abs(abs(np.max(predict)) - 100)
+        if d > 100:
+            d = 100
+        epson = -0.009 * d + 1
+        if np.random.uniform() < epson:
             move_chess = random.choice(move_chess_all)
         else:
-            move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]
-
+            move_chess = move_chess_all[np.argmax(predict)]
         return move_chess
 
     def chess_manual_all(self, chess_manual, player):
@@ -506,6 +513,7 @@ class Engine:
         chess_manual_all = []  # 储存当前局面下的所有走法的局面
         move_chess_all = []
         victory_or_defeat = False
+        move_chess = False
         if enemy_general not in chess_manual.values():
             victory_or_defeat = True
             print(player)
@@ -533,10 +541,11 @@ class Engine:
                         move_chess_all.append((chess, coordinate))
                         if general not in chess_manual_clone.values():
                             reward = -100
+                            move_chess = (chess, coordinate)
             if not move_chess_all:
                 unterminated = False
                 reward = 100
-        return reward, unterminated, chess_manual, move_chess_all, chess_manual_all, victory_or_defeat
+        return reward, unterminated, chess_manual, move_chess_all, chess_manual_all, victory_or_defeat, move_chess
 
     def simulation_chess(self, chess_manual_initial, player_initial):
         """模拟下完一整盘棋，以独热编码形式返回每步局面以及胜负"""
@@ -548,8 +557,9 @@ class Engine:
         num, chess_num = 0, len(chess_manual)
         victory_or_defeat = False
         move_chess_all, chess_manual_all = self.chess_manual_all(chess_manual, player[0])  # 计算所有的走法和局面
+        move_chess = False
         while unterminated:
-            move_chess = self.choose_action(move_chess_all, chess_manual_all)  # 从所有的走法中选择一个走法
+            move_chess = self.choose_action(move_chess_all, chess_manual_all, move_chess)  # 从所有的走法中选择一个走法
             chess_manual[move_chess[1]] = chess_manual[move_chess[0]]  # 根据选择的走法走棋
             chess_manual.pop(move_chess[0])
             train = self.one_hot_chess_manual(chess_manual, player[0])
@@ -562,7 +572,7 @@ class Engine:
                 num, chess_num = 0, len(chess_manual)
             if trains.count(trains[-1]) >= 3:
                 num = 50
-            reward, unterminated, chess_manual, move_chess_all, chess_manual_all, victory_or_defeat = self.reward(chess_manual, player, num)
+            reward, unterminated, chess_manual, move_chess_all, chess_manual_all, victory_or_defeat, move_chess = self.reward(chess_manual, player, num)
 
             if unterminated:
                 if reward == -1:
@@ -605,18 +615,21 @@ class Engine:
     def train_model(self):
         print("训练开始...")
         time_train = time.time()
+        num = 0
         while self.start_train:
             time_start = time.time()
             trains, labels = self.simulation_chess(self.initial_chess_manual, "红黑")
             trains.extend(self.trains)
             labels.extend(self.labels)
             trains, labels = tf.cast(trains, tf.int16), tf.cast(labels, tf.float64)
-            self.train_model_step(trains, labels)  # 训练模型
-            if len(self.labels) > 50:
+            for i in range(5):
+                self.train_model_step(trains, labels)  # 训练模型
+            if len(self.labels) > 20:
                 self.trains = []
                 self.labels = []
             time_end = time.time()
-            print('self.labels:', len(self.labels), '样本:', len(labels), 'time: ', time_end - time_start, 'train_time:', time_end - time_train)
+            num += 1
+            print('self.labels:', len(self.labels), '样本:', len(labels), 'time: ', int(time_end - time_start), 'train_time:', int(time_end - time_train), 'num', num)
         current_time = time.strftime('%Y-%m-%d_%H：%M：%S', time.localtime(time.time()))  # 获取当前时间
         checkpoint_prefix = os.path.join(self.checkpoint_dir, current_time)  # 拼接文件名
         self.checkpoint.save(file_prefix=checkpoint_prefix)  # 保存模型

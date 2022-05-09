@@ -37,6 +37,9 @@ class Checkerboard:
         self.move_what = None
         self.player_pos = True  # 表示黑棋在上红棋在下
         self.end = False
+        self.work = False
+        self.r_value = "0"
+        self.b_value = "0"
         self.button_coordinate0 = [580, 251]
         self.button_coordinate1 = [580, 271]
         self.button_coordinate2 = [580, 291]
@@ -75,8 +78,12 @@ class Checkerboard:
         self.screen.blit(self.button_image, self.button_coordinate1)
         self.screen.blit(self.button_image, self.button_coordinate2)
         self.screen.blit(self.button_image, self.button_coordinate3)
+        self.screen.blit(self.font.render("B:" + self.b_value, True, (0, 0, 0)), (558, 253))
+        self.screen.blit(self.font.render("R:" + self.r_value, True, (0, 0, 0)), (558, 313))
         self.screen.blit(self.font.render(self.move_what, True, (0, 0, 0)), (558, 273))  # 显示走棋
         self.screen.blit(self.font.render(self.chess_player[0] + "方走", True, (0, 0, 0)), (558, 293))  # 显示走棋棋手
+        if self.work:
+            self.screen.blit(self.font.render("思考中.", True, (0, 0, 0)), (558, 333))
 
     def process_events(self):
         """处理事件"""
@@ -94,29 +101,37 @@ class Checkerboard:
         if self.button_coordinate0[0] < event.pos[0] < self.button_coordinate0[0] + 18 and self.button_coordinate0[1] < event.pos[1] < self.button_coordinate0[1] + 18:
             if self.engine.start_train:
                 self.engine.start_train = False
+                self.work = False
                 print("正在结束，请稍等。。。")
             elif len(threading.enumerate()) <= 1:
                 self.engine.start_train = True
+                self.work = True
                 threading.Thread(target=self.engine.train_model).start()  # 启动线程，即让线程开始执行
         elif self.button_coordinate1[0] < event.pos[0] < self.button_coordinate1[0] + 18 and self.button_coordinate1[1] < event.pos[1] < self.button_coordinate1[1] + 18:
-            self.flip_board()  # 翻转棋盘
-        elif self.button_coordinate2[0] < event.pos[0] < self.button_coordinate2[0] + 18 and self.button_coordinate2[1] < event.pos[1] < self.button_coordinate2[1] + 18 and \
-                self.end is False:
             if len(threading.enumerate()) <= 1:
+                self.flip_board()  # 翻转棋盘
+        elif self.button_coordinate2[0] < event.pos[0] < self.button_coordinate2[0] + 18 and self.button_coordinate2[1] < event.pos[1] < self.button_coordinate2[1] + 18 and \
+                self.end is False:  # 电脑思考
+            if len(threading.enumerate()) <= 1:
+                self.work = True
                 threading.Thread(target=self.computer_think).start()  # 电脑思考  启动线程，即让线程开始执行
         elif self.button_coordinate3[0] < event.pos[0] < self.button_coordinate3[0] + 18 and self.button_coordinate3[1] < event.pos[1] < self.button_coordinate3[1] + 18:
             # 开始新局,将各个属性恢复默认
-            self.chess_manual = {}  # 清空棋子
-            self.create_chess()  # 创建棋子
-            self.checked_of_chess = None  # 默认没有棋子被选中
-            self.chess_player = "红黑"  # 走棋玩家，默认红方先走
-            self.end = False
-            self.move_what = None
-            self.player_pos = True  # 表示黑棋在上红棋在下
-            self.move_chess_track = [None, None]  # 落子轨迹，为两个棋盘坐标，默认为空
-            self.last_mouse_coordinate = (None, None)  # 上次鼠标点击的棋盘坐标，默认为空
+            if len(threading.enumerate()) <= 1:
+                self.chess_manual = {}  # 清空棋子
+                self.create_chess()  # 创建棋子
+                self.checked_of_chess = None  # 默认没有棋子被选中
+                self.chess_player = "红黑"  # 走棋玩家，默认红方先走
+                self.r_value = "0"
+                self.b_value = "0"
+                self.end = False
+                self.move_what = None
+                self.player_pos = True  # 表示黑棋在上红棋在下
+                self.move_chess_track = [None, None]  # 落子轨迹，为两个棋盘坐标，默认为空
+                self.last_mouse_coordinate = (None, None)  # 上次鼠标点击的棋盘坐标，默认为空
         elif self.end is False:
-            self.update_checkerboard_state(self.translate_coordinate(event.pos))  # 更新棋盘状态属性
+            if len(threading.enumerate()) <= 1:
+                self.update_checkerboard_state(self.translate_coordinate(event.pos))  # 更新棋盘状态属性
 
     def update_checkerboard_state(self, now_mouse_coordinate):
         """接收鼠标点击的棋盘坐标，更新棋盘状态属性，判断是要走棋还是要干什么"""
@@ -167,14 +182,18 @@ class Checkerboard:
         nm = {}
         b = list(m.keys())
         random.shuffle(b)
-        # b.sort()
         for i in b:
             nm[i] = m[i]
 
-        move_chess = self.engine.connector(nm, self.chess_player)
+        move_chess, ucb1 = self.engine.connector(nm, self.chess_player)
+        if self.chess_player == "红黑":
+            self.r_value = str(int(ucb1))
+        else:
+            self.b_value = str(int(ucb1))
         chess = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[0], self.player_pos)
         coordinate = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[1], self.player_pos)
         self.move_chess(self.chess_manual[chess], coordinate)
+        self.work = False
         self.draw_chess()  # 在窗口中画上棋盘，棋子，各种效果等
         pygame.display.update()  # 刷新界面
 
@@ -551,17 +570,15 @@ class Engine:
         root_node.create_child_nodes()
         a = len(root_node.child_nodes)
         n = 0
-        s = time.time()
         while n <= a:
             self.mcts(root_node)
             n += 1
             print('\r', n, end='')
-        print('===', time.time() - s)
         choose_node = root_node.child_nodes[0]
         for child_node in root_node.child_nodes:
             if child_node.ucb1 > choose_node.ucb1:
                 choose_node = child_node
-        return choose_node.move_chess
+        return choose_node.move_chess, choose_node.ucb1
 
     def choose_action(self, move_chess_all, chess_manual_all, move_chess):
         """如果有杀棋直接杀，否则90%的情况下选择价值最大的，10%的情况下随机选择"""

@@ -171,8 +171,7 @@ class Checkerboard:
         for i in b:
             nm[i] = m[i]
 
-        # move_chess = self.engine.connector(nm, self.chess_player[0])
-        move_chess = self.engine.connector_test(nm, self.chess_player)
+        move_chess = self.engine.connector(nm, self.chess_player)
         chess = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[0], self.player_pos)
         coordinate = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[1], self.player_pos)
         self.move_chess(self.chess_manual[chess], coordinate)
@@ -398,6 +397,22 @@ class Node:
         self.players = players
 
     @property
+    def enemy_general(self):
+        if self.players == '红黑':
+            enemy_general = '黑将'
+        else:
+            enemy_general = '红帅'
+        return enemy_general
+
+    @property
+    def general(self):
+        if self.players == '红黑':
+            general = '红帅'
+        else:
+            general = '黑将'
+        return general
+
+    @property
     def ucb1(self):
         if self.search_num == 0:
             ucb1 = float("inf")
@@ -412,7 +427,10 @@ class Node:
                     chess_manual_child_node = self.chess_manual.copy()
                     chess_manual_child_node[coordinate] = chess_manual_child_node[chess]
                     chess_manual_child_node.pop(chess)
-
+                    if self.enemy_general not in chess_manual_child_node.values():
+                        self.child_nodes = []
+                        self.child_nodes.append(Node(chess_manual_child_node, self.players, move_chess=(chess, coordinate), root_node=self.root_node))
+                        return
                     self.child_nodes.append(Node(chess_manual_child_node, self.players, move_chess=(chess, coordinate), root_node=self.root_node))
 
 
@@ -497,73 +515,53 @@ class Engine:
             node.search_num += 1
         else:
             if node.search_num == 0:  # 如果该节点n为0，则ROLLOUT
-                enemy_chess_manual = Checkerboard.enemy_chess_manual(node.chess_manual)
-                move_chess_all, chess_manual_all = self.chess_manual_all(enemy_chess_manual, node.players[1])
-                move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]  # 估计对对手最有利，对己方最不利的走法
-                enemy_chess_manual[move_chess[1]] = enemy_chess_manual[move_chess[0]]  # 根据选择的走法走棋
-                enemy_chess_manual.pop(move_chess[0])
-                node.chess_manual = Checkerboard.enemy_chess_manual(enemy_chess_manual)
-
-                move_chess_all, chess_manual_all = self.chess_manual_all(node.chess_manual, node.players[0])
-                search_value = np.max(self.chess_model(tf.cast(chess_manual_all, tf.int16)))
+                if node.enemy_general in node.chess_manual.values():
+                    enemy_chess_manual = Checkerboard.enemy_chess_manual(node.chess_manual)
+                    move_chess_all, chess_manual_all = self.chess_manual_all(enemy_chess_manual, node.players[1])
+                    move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]  # 估计对对手最有利，对己方最不利的走法
+                    enemy_chess_manual[move_chess[1]] = enemy_chess_manual[move_chess[0]]  # 根据选择的走法走棋
+                    enemy_chess_manual.pop(move_chess[0])
+                    node.chess_manual = Checkerboard.enemy_chess_manual(enemy_chess_manual)
+                    if node.general in node.chess_manual.values():
+                        move_chess_all, chess_manual_all = self.chess_manual_all(node.chess_manual, node.players[0])
+                        search_value = np.max(self.chess_model(tf.cast(chess_manual_all, tf.int16)))
+                    else:
+                        search_value = -100
+                else:
+                    search_value = 100
                 node.value += search_value
                 node.search_num += 1
-                # if node.players == '红黑':
-                #     general = '红帅'
-                # else:
-                #     general = '黑将'
-                # if general not in node.chess_manual.values():
-                #     search_value = 0
-                #     node.value += -float("inf")
-                # else:
-                #     move_chess_all, chess_manual_all = self.chess_manual_all(node.chess_manual, node.players[0])
-                #     predict = self.chess_model(tf.cast(chess_manual_all, tf.int16))
-                #     search_value = np.max(predict)
-                #     node.value += search_value
             else:
-                node.create_child_nodes()
-                search_value = self.mcts(node.child_nodes[0])
+                if node.general in node.chess_manual.values():
+                    if node.enemy_general in node.chess_manual.values():
+                        node.create_child_nodes()
+                        search_value = self.mcts(node.child_nodes[0])
+                    else:
+                        search_value = 100
+                else:
+                    search_value = -100
                 node.value += search_value
                 node.search_num += 1
-                # if current_node.players == '红黑':
-                #     general = '红帅'
-                # else:
-                #     general = '黑将'
-                # if general not in current_node.chess_manual.values():
-                #     search_value = 0
-                #     current_node.value += -float("inf")
-                # else:
-                #     move_chess_all, chess_manual_all = self.chess_manual_all(current_node.chess_manual, current_node.players[0])
-                #     predict = self.chess_model(tf.cast(chess_manual_all, tf.int16))
-                #     search_value = np.max(predict)
-                #     current_node.value += search_value
         return search_value
 
-    def connector_test(self, chess_manual, players):
+    def connector(self, chess_manual, players):
+        """接口程序"""
         root_node = Node(chess_manual, players)  # 创建根节点
         root_node.root_node = root_node  # 根节点的'根节点'属性为自己
         root_node.create_child_nodes()
         a = len(root_node.child_nodes)
         n = 0
+        s = time.time()
         while n <= a:
             self.mcts(root_node)
             n += 1
             print('\r', n, end='')
-
+        print('===', time.time() - s)
         choose_node = root_node.child_nodes[0]
         for child_node in root_node.child_nodes:
             if child_node.ucb1 > choose_node.ucb1:
                 choose_node = child_node
-
         return choose_node.move_chess
-
-    def connector(self, chess_manual, player):
-        """接口程序"""
-        move_chess_all, chess_manual_all = self.chess_manual_all(chess_manual, player)
-        predict = self.chess_model(tf.cast(chess_manual_all, tf.int16))
-        move_chess = move_chess_all[np.argmax(predict)]
-        print(np.max(predict))
-        return move_chess
 
     def choose_action(self, move_chess_all, chess_manual_all, move_chess):
         """如果有杀棋直接杀，否则90%的情况下选择价值最大的，10%的情况下随机选择"""

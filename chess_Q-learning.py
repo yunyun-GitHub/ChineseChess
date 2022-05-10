@@ -534,7 +534,7 @@ class Engine:
 
                     enemy_chess_manual = Checkerboard.enemy_chess_manual(chess_manual_child_node)
                     move_chess_all, chess_manual_all = self.chess_manual_all(enemy_chess_manual, node.players[1])
-                    move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]  # 估计对对手最有利，对己方最不利的走法
+                    move_chess = move_chess_all[np.argmax(self.chess_model(np.array(chess_manual_all)))]  # 估计对对手最有利，对己方最不利的走法
                     enemy_chess_manual[move_chess[1]] = enemy_chess_manual[move_chess[0]]  # 根据选择的走法走棋
                     enemy_chess_manual.pop(move_chess[0])
                     chess_manual_child_node = Checkerboard.enemy_chess_manual(enemy_chess_manual)
@@ -552,7 +552,7 @@ class Engine:
             node.search_num += 1
         else:
             if node.search_num == 0:  # 如果该节点n为0，则ROLLOUT
-                search_value = np.max(self.chess_model(tf.cast(self.chess_manual_all(node.chess_manual, node.players[0])[1], tf.int16)))
+                search_value = np.max(self.chess_model(np.array(self.chess_manual_all(node.chess_manual, node.players[0])[1])))
                 node.value += search_value
                 node.search_num += 1
             else:
@@ -574,6 +574,7 @@ class Engine:
         root_node.root_node = root_node  # 根节点的'根节点'属性为自己
         s1 = time.time()
         self.create_child_nodes(root_node)
+        print(time.time() - s1)
         len_root_node_child_nodes = len(root_node.child_nodes)
         n = 0
         while n < len_root_node_child_nodes:
@@ -589,7 +590,7 @@ class Engine:
             return choose_node.move_chess, choose_node.ucb1
         else:
             move_chess_all, chess_manual_all = self.chess_manual_all(chess_manual, players[0])
-            move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]
+            move_chess = move_chess_all[np.argmax(self.chess_model(np.array(chess_manual_all)))]
             return move_chess, -100
 
     def choose_action(self, move_chess_all, chess_manual_all, move_chess):
@@ -597,7 +598,7 @@ class Engine:
         if move_chess:
             return move_chess
 
-        predict = self.chess_model(tf.cast(chess_manual_all, tf.int16))
+        predict = self.chess_model(np.array(chess_manual_all))
         d = abs(abs(np.max(predict)) - 100)
         if d > 100:
             d = 100
@@ -710,7 +711,7 @@ class Engine:
                 if reward == -100:
                     potential_value = reward
                 else:
-                    estimate_move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]  # 估计对对手最有利，对己方最不利的走法
+                    estimate_move_chess = move_chess_all[np.argmax(self.chess_model(np.array(chess_manual_all)))]  # 估计对对手最有利，对己方最不利的走法
 
                     estimate_chess_manual = chess_manual.copy()
                     estimate_chess_manual[estimate_move_chess[1]] = estimate_chess_manual[estimate_move_chess[0]]  # 根据选择的走法走棋
@@ -719,7 +720,7 @@ class Engine:
 
                     estimate_move_chess_all, estimate_chess_manual_all = self.chess_manual_all(estimate_chess_manual, players[0])  # 计算所有的走法和局面
                     if estimate_move_chess_all:
-                        potential_value = reward + 0.9 * np.max(self.chess_model(tf.cast(estimate_chess_manual_all, tf.int16)))  # 估计对自己最有利，对对手最不利的走法
+                        potential_value = reward + 0.9 * np.max(self.chess_model(np.array(estimate_chess_manual_all)))  # 估计对自己最有利，对对手最不利的走法
                     else:
                         potential_value = reward
             else:
@@ -752,7 +753,7 @@ class Engine:
             trains, labels = self.simulation_chess(self.initial_chess_manual, "红黑")
             trains.extend(self.trains)
             labels.extend(self.labels)
-            trains, labels = tf.cast(trains, tf.int16), tf.cast(labels, tf.float64)
+            trains, labels = np.array(trains), tf.cast(labels, tf.float32)
             for i in range(5):
                 self.train_model_step(trains, labels)  # 训练模型
             if len(self.labels) > 20:

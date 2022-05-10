@@ -38,8 +38,8 @@ class Checkerboard:
         self.player_pos = True  # 表示黑棋在上红棋在下
         self.end = False
         self.work = False
-        self.r_value = "0"
-        self.b_value = "0"
+        self.r_value = 0
+        self.b_value = 0
         self.button_coordinate0 = [580, 251]
         self.button_coordinate1 = [580, 271]
         self.button_coordinate2 = [580, 291]
@@ -78,8 +78,8 @@ class Checkerboard:
         self.screen.blit(self.button_image, self.button_coordinate1)
         self.screen.blit(self.button_image, self.button_coordinate2)
         self.screen.blit(self.button_image, self.button_coordinate3)
-        self.screen.blit(self.font.render("B:" + self.b_value, True, (0, 0, 0)), (558, 253))
-        self.screen.blit(self.font.render("R:" + self.r_value, True, (0, 0, 0)), (558, 313))
+        self.screen.blit(self.font.render("B:" + str(self.b_value), True, (0, 0, 0)), (558, 253))
+        self.screen.blit(self.font.render("R:" + str(self.r_value), True, (0, 0, 0)), (558, 313))
         self.screen.blit(self.font.render(self.move_what, True, (0, 0, 0)), (558, 273))  # 显示走棋
         self.screen.blit(self.font.render(self.chess_player[0] + "方走", True, (0, 0, 0)), (558, 293))  # 显示走棋棋手
         if self.work:
@@ -143,7 +143,12 @@ class Checkerboard:
                     self.checked_of_chess = chess  # 把点击的棋子标记为选中状态
                 self.last_mouse_coordinate = now_mouse_coordinate  # 更新上次点击的棋盘坐标
             else:  # 否则说明要将选中的棋子走到点击的棋盘坐标
-                self.move_chess(self.checked_of_chess, now_mouse_coordinate)  # 将选中的棋子走到点击的棋盘坐标
+                value = self.move_chess(self.checked_of_chess, now_mouse_coordinate)  # 将选中的棋子走到点击的棋盘坐标
+                if value:
+                    if self.chess_player == "黑红":
+                        self.r_value = int(value)
+                    else:
+                        self.b_value = int(value)
                 self.last_mouse_coordinate = (None, None)  # 更新上次点击的棋盘坐标
 
     def move_chess(self, chess, coordinate):
@@ -151,7 +156,7 @@ class Checkerboard:
         m = {}
         for i in self.chess_manual:
             m[Checkerboard.player_coordinate_convert("盘转" + self.chess_player[0], i, self.player_pos)] = self.chess_manual[i].name
-
+        value = False
         player_chess = Checkerboard.player_coordinate_convert("盘转" + self.chess_player[0], chess.coordinate, self.player_pos)
         player_coordinate = Checkerboard.player_coordinate_convert("盘转" + self.chess_player[0], coordinate, self.player_pos)
         if player_coordinate in Checkerboard.may_coordinate(player_chess, m):
@@ -160,6 +165,11 @@ class Checkerboard:
             self.chess_manual[coordinate] = chess
             self.chess_manual.pop(chess.coordinate)
             chess.coordinate = coordinate  # 将接收到的棋子走到指定坐标
+
+            m[player_coordinate] = m[player_chess]
+            m.pop(player_chess)
+            value = np.max(self.engine.chess_model(tf.reshape(tf.cast(self.engine.one_hot_chess_manual(m, self.chess_player[0]), tf.int16), (1, 10, 9, 15))))
+
             self.move_chess_track[1] = chess.pixel_coordinate  # 更新落子轨迹
             self.chess_player = self.chess_player[::-1]  # 更新走棋棋手
             general = []
@@ -173,6 +183,7 @@ class Checkerboard:
                 self.end = True
                 print("黑方胜")
         self.checked_of_chess = None  # 更新选中状态
+        return value
 
     def computer_think(self):
         m = {}
@@ -187,9 +198,9 @@ class Checkerboard:
 
         move_chess, ucb1 = self.engine.connector(nm, self.chess_player)
         if self.chess_player == "红黑":
-            self.r_value = str(int(ucb1))
+            self.r_value = int(ucb1)
         else:
-            self.b_value = str(int(ucb1))
+            self.b_value = int(ucb1)
         chess = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[0], self.player_pos)
         coordinate = Checkerboard.player_coordinate_convert(self.chess_player[0] + "转盘", move_chess[1], self.player_pos)
         self.move_chess(self.chess_manual[chess], coordinate)
@@ -439,19 +450,6 @@ class Node:
             ucb1 = self.value / self.search_num + 2 * math.sqrt(math.log(self.root_node.search_num) / self.search_num)
         return ucb1
 
-    def create_child_nodes(self):
-        for chess in self.chess_manual:
-            if self.chess_manual[chess][0] == self.players[0]:
-                for coordinate in Checkerboard.may_coordinate(chess, self.chess_manual):
-                    chess_manual_child_node = self.chess_manual.copy()
-                    chess_manual_child_node[coordinate] = chess_manual_child_node[chess]
-                    chess_manual_child_node.pop(chess)
-                    if self.enemy_general not in chess_manual_child_node.values():
-                        self.child_nodes = []
-                        self.child_nodes.append(Node(chess_manual_child_node, self.players, move_chess=(chess, coordinate), root_node=self.root_node))
-                        return
-                    self.child_nodes.append(Node(chess_manual_child_node, self.players, move_chess=(chess, coordinate), root_node=self.root_node))
-
 
 class Engine:
     """引擎"""
@@ -522,6 +520,27 @@ class Engine:
         ])
         return model
 
+    def create_child_nodes(self, node):
+        for chess in node.chess_manual:
+            if node.chess_manual[chess][0] == node.players[0]:
+                for coordinate in Checkerboard.may_coordinate(chess, node.chess_manual):
+                    chess_manual_child_node = node.chess_manual.copy()
+                    chess_manual_child_node[coordinate] = chess_manual_child_node[chess]
+                    chess_manual_child_node.pop(chess)
+                    if node.enemy_general not in chess_manual_child_node.values():
+                        node.child_nodes = []
+                        node.child_nodes.append(Node(chess_manual_child_node, node.players, move_chess=(chess, coordinate), root_node=node.root_node))
+                        return
+
+                    enemy_chess_manual = Checkerboard.enemy_chess_manual(chess_manual_child_node)
+                    move_chess_all, chess_manual_all = self.chess_manual_all(enemy_chess_manual, node.players[1])
+                    move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]  # 估计对对手最有利，对己方最不利的走法
+                    enemy_chess_manual[move_chess[1]] = enemy_chess_manual[move_chess[0]]  # 根据选择的走法走棋
+                    enemy_chess_manual.pop(move_chess[0])
+                    chess_manual_child_node = Checkerboard.enemy_chess_manual(enemy_chess_manual)
+                    if node.general in chess_manual_child_node.values():
+                        node.child_nodes.append(Node(chess_manual_child_node, node.players, move_chess=(chess, coordinate), root_node=node.root_node))
+
     def mcts(self, node):
         if node.child_nodes:  # child_nodes有值为枝节点，为空则为叶子节点
             search_node = node.child_nodes[0]
@@ -529,31 +548,17 @@ class Engine:
                 if child_node.ucb1 > search_node.ucb1:
                     search_node = child_node
             search_value = self.mcts(search_node)
-
             node.value += search_value
             node.search_num += 1
         else:
             if node.search_num == 0:  # 如果该节点n为0，则ROLLOUT
-                if node.enemy_general in node.chess_manual.values():
-                    enemy_chess_manual = Checkerboard.enemy_chess_manual(node.chess_manual)
-                    move_chess_all, chess_manual_all = self.chess_manual_all(enemy_chess_manual, node.players[1])
-                    move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]  # 估计对对手最有利，对己方最不利的走法
-                    enemy_chess_manual[move_chess[1]] = enemy_chess_manual[move_chess[0]]  # 根据选择的走法走棋
-                    enemy_chess_manual.pop(move_chess[0])
-                    node.chess_manual = Checkerboard.enemy_chess_manual(enemy_chess_manual)
-                    if node.general in node.chess_manual.values():
-                        move_chess_all, chess_manual_all = self.chess_manual_all(node.chess_manual, node.players[0])
-                        search_value = np.max(self.chess_model(tf.cast(chess_manual_all, tf.int16)))
-                    else:
-                        search_value = -100
-                else:
-                    search_value = 100
+                search_value = np.max(self.chess_model(tf.cast(self.chess_manual_all(node.chess_manual, node.players[0])[1], tf.int16)))
                 node.value += search_value
                 node.search_num += 1
             else:
                 if node.general in node.chess_manual.values():
                     if node.enemy_general in node.chess_manual.values():
-                        node.create_child_nodes()
+                        self.create_child_nodes(node)
                         search_value = self.mcts(node.child_nodes[0])
                     else:
                         search_value = 100
@@ -567,18 +572,25 @@ class Engine:
         """接口程序"""
         root_node = Node(chess_manual, players)  # 创建根节点
         root_node.root_node = root_node  # 根节点的'根节点'属性为自己
-        root_node.create_child_nodes()
-        a = len(root_node.child_nodes)
+        s1 = time.time()
+        self.create_child_nodes(root_node)
+        len_root_node_child_nodes = len(root_node.child_nodes)
         n = 0
-        while n <= a:
+        while n < len_root_node_child_nodes:
             self.mcts(root_node)
             n += 1
             print('\r', n, end='')
-        choose_node = root_node.child_nodes[0]
-        for child_node in root_node.child_nodes:
-            if child_node.ucb1 > choose_node.ucb1:
-                choose_node = child_node
-        return choose_node.move_chess, choose_node.ucb1
+        if len_root_node_child_nodes > 0:
+            choose_node = root_node.child_nodes[0]
+            for child_node in root_node.child_nodes:
+                if child_node.ucb1 > choose_node.ucb1:
+                    choose_node = child_node
+            print('\n', time.time() - s1)
+            return choose_node.move_chess, choose_node.ucb1
+        else:
+            move_chess_all, chess_manual_all = self.chess_manual_all(chess_manual, players[0])
+            move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]
+            return move_chess, -100
 
     def choose_action(self, move_chess_all, chess_manual_all, move_chess):
         """如果有杀棋直接杀，否则90%的情况下选择价值最大的，10%的情况下随机选择"""
@@ -650,10 +662,7 @@ class Engine:
         else:
             unterminated = True
             reward = 0
-            m = {}  # 将坐标转到对手坐标
-            for chess in chess_manual:
-                m[(10 - chess[0], 11 - chess[1])] = chess_manual[chess]
-            chess_manual = m
+            chess_manual = Checkerboard.enemy_chess_manual(chess_manual)  # 将坐标转到对手坐标
             for chess in chess_manual:
                 if chess_manual[chess][0] == players[1]:
                     for coordinate in Checkerboard.may_coordinate(chess, chess_manual):
@@ -688,7 +697,6 @@ class Engine:
             chess_manual.pop(move_chess[0])
             train = self.one_hot_chess_manual(chess_manual, players[0])
             trains.append(train)
-            current_value = self.chess_model(tf.reshape(tf.cast(train, tf.int16), (1, 10, 9, 15)))
 
             if len(chess_manual) == chess_num:
                 num += 1
@@ -699,7 +707,7 @@ class Engine:
             reward, unterminated, chess_manual, move_chess_all, chess_manual_all, victory_or_defeat, move_chess = self.reward(chess_manual, players, num)
 
             if unterminated:
-                if reward == -1:
+                if reward == -100:
                     potential_value = reward
                 else:
                     estimate_move_chess = move_chess_all[np.argmax(self.chess_model(tf.cast(chess_manual_all, tf.int16)))]  # 估计对对手最有利，对己方最不利的走法
@@ -707,17 +715,16 @@ class Engine:
                     estimate_chess_manual = chess_manual.copy()
                     estimate_chess_manual[estimate_move_chess[1]] = estimate_chess_manual[estimate_move_chess[0]]  # 根据选择的走法走棋
                     estimate_chess_manual.pop(estimate_move_chess[0])
-
-                    m = {}  # 将坐标转到自己坐标
-                    for chess in estimate_chess_manual:
-                        m[(10 - chess[0], 11 - chess[1])] = estimate_chess_manual[chess]
-                    estimate_chess_manual = m
+                    estimate_chess_manual = Checkerboard.enemy_chess_manual(estimate_chess_manual)  # 将坐标转到对手坐标
 
                     estimate_move_chess_all, estimate_chess_manual_all = self.chess_manual_all(estimate_chess_manual, players[0])  # 计算所有的走法和局面
-                    potential_value = reward + 0.9 * np.max(self.chess_model(tf.cast(estimate_chess_manual_all, tf.int16)))  # 估计对自己最有利，对对手最不利的走法
+                    if estimate_move_chess_all:
+                        potential_value = reward + 0.9 * np.max(self.chess_model(tf.cast(estimate_chess_manual_all, tf.int16)))  # 估计对自己最有利，对对手最不利的走法
+                    else:
+                        potential_value = reward
             else:
                 potential_value = reward
-            label = current_value + 1 * (potential_value - current_value)
+            label = potential_value
             labels.append(label)
             players = players[::-1]
         if victory_or_defeat is True:

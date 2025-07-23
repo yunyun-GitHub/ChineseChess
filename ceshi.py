@@ -59,22 +59,28 @@ class Game:
 
         if row < 0:  # 点击了棋盘边缘
             if row == -2:
-                print("点击了按钮", pos)
+                print("点击了按钮, 重置游戏", pos)
+                self.pr = copy.deepcopy(self.board)
+                self.pb = copy.deepcopy(self.board)
+                self.checked = [-1, -1]  # 记录选中的坐标, 默认为-1, 表示为空
+                self.tracked = [[-1, -1], [-1, -1]]  # 落子轨迹，为两个棋盘坐标，默认为空
+                self.player = 1  # 1表示轮到红方走, -1表示轮到黑方走, 默认红方先走
             self.checked = [-1, -1]  # 重置选中状态
             return
 
+        # 能走到这里说明鼠标点击了坐标
         if self.checked[0] < 0:  # 说明之前没有选中棋子
             # 乘积大于0表示符号相同, 说明点击的位置有棋子, 并且属于当前玩家
-            if self.pr[row][col] * self.player > 0:
+            if self.pr[row][col] * self.player > 0:  # 默认红方在下,借用红方坐标
                 self.checked = coordinate  # 记录选中坐标
             return
 
         # 说明之前已经选中了一个棋子，现在要移动
-        (sr, sc), (er, ec) = self.checked, coordinate  # 解构元组, 如果两个坐标相同, 相当于没走
-        ar = [sr, sc, er, ec]
-        ab = [9 - sr, 8 - sc, 9 - er, 8 - ec]
+        (sr, sc), (er, ec) = self.checked, coordinate
+        ar = [sr, sc, er, ec]                  # 红方坐标下,自己或对方的动作
+        ab = [9 - sr, 8 - sc, 9 - er, 8 - ec]  # 黑方坐标下,自己或对方的动作
 
-        a, b = (ar, self.pr) if self.player == 1 else (ab, self.pb)
+        a, b = (ar, self.pr) if self.player == 1 else (ab, self.pb)  # 当前玩家的动作与局面
         if self.validate(a, b):  # 验证移动合法
             self.move(ar, ab)
             self.tracked = [self.checked, coordinate]
@@ -84,7 +90,6 @@ class Game:
     def move(self, ar, ab):
         """接受一个动作, 执行走棋"""
         sr, sc, er, ec = ar  # 解构元组, 如果两个坐标相同, 相当于没走
-        self.board[sr][sc], self.board[er][ec] = 0, self.board[sr][sc]
         self.pr[sr][sc], self.pr[er][ec] = 0, self.pr[sr][sc]
 
         sr, sc, er, ec = ab  # 解构元组, 如果两个坐标相同, 相当于没走
@@ -95,7 +100,7 @@ class Game:
         self.screen.blit(self.board_image, (0, 0))  # 画棋盘
 
         # 接受一个棋盘二维列表, 遍历所有的元素和索引
-        for i, row in enumerate(self.board):
+        for i, row in enumerate(self.pr):
             for j, val in enumerate(row):
                 if val != 0:
                     piece_image = self.num_piece[val]  # 获取已经加载的图片
@@ -126,10 +131,11 @@ class Game:
                 for dr, dc, s in [(0, 1, 8 - sc), (-1, 0, sr), (0, -1, sc), (1, 0, 9 - sr)]:
                     for t in range(1, s + 1):
                         tr, tc = sr + dr * t, sc + dc * t
-                        if board[tr][tc] == 0:
+                        val = board[tr][tc]
+                        if val == 0:
                             mvs.append([tr, tc])
                         else:
-                            if board[tr][tc] < 0:
+                            if val < 0:
                                 mvs.append([tr, tc])
                             break
             case 6:
